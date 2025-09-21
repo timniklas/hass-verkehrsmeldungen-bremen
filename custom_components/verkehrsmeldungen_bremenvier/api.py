@@ -10,7 +10,7 @@ import os
 from .const import TRAFFIC_URL, DE_MONTHS
 
 class TrafficAPI:
-    def __init__(self, session: Optional[aiohttp.ClientSession] = None):
+    def __init__(self, session: aiohttp.ClientSession):
         self._session = session
 
     @staticmethod
@@ -40,33 +40,14 @@ class TrafficAPI:
         except ValueError:
             return None
 
-    async def _fetch_html(self, source: str, *, timeout_s: int = 20) -> str:
-        """
-        Load HTML either from a local file path or from a URL.
-        - URLs: fetched via aiohttp (async)
-        - Files: read in a thread pool to avoid blocking the loop
-        """
-        if re.match(r"^https?://", source):
-            close_when_done = False
-            session = self._session
-            if session is None:
-                session = aiohttp.ClientSession(timeout=ClientTimeout(total=timeout_s))
-                close_when_done = True
+    async def _fetch_html(self, source: str) -> str:
             try:
-                async with session.get(
-                    source,
-                    headers={"User-Agent": "traffic-scraper/1.0 (+https://example.local)"}
-                ) as resp:
+                async with self._session.get(source) as resp:
                     resp.raise_for_status()
                     # let aiohttp handle encoding detection
                     return await resp.text()
             finally:
-                if close_when_done:
-                    await session.close()
-        else:
-            loop = asyncio.get_running_loop()
-            path = os.fspath(source)
-            return await loop.run_in_executor(None, lambda: open(path, "r", encoding="utf-8").read())
+                await self._session.close()
 
     @staticmethod
     def _parse_traffic(html: str) -> List[Dict[str, Any]]:
