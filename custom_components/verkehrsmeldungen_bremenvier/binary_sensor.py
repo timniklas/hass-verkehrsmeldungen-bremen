@@ -62,7 +62,7 @@ class TrafficSensor(CoordinatorEntity):
     @property
     def is_on(self) -> bool:
         """Return the state of the sensor."""
-        return len(self.coordinator.data.items) > self._itemid
+        return len(self.coordinator.data.items) >= self._itemid
 
     @property
     def state(self):
