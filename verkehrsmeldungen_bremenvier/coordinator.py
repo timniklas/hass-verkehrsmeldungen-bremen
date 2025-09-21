@@ -43,7 +43,7 @@ class TrafficCoordinator(DataUpdateCoordinator):
         )
         self.connected: bool = False
         websession = async_get_clientsession(hass)
-        self.api = TrafficAPI()
+        self.api = TrafficAPI(websession)
 
     async def async_update_data(self):
         """Fetch data from API endpoint.
