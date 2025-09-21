@@ -1,24 +1,27 @@
-import sys
+import asyncio
 import json
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from bs4 import BeautifulSoup
-import requests
-
-DE_MONTHS = {
-    "januar": 1, "februar": 2, "märz": 3, "maerz": 3, "april": 4, "mai": 5, "juni": 6,
-    "juli": 7, "august": 8, "september": 9, "oktober": 10, "november": 11, "dezember": 12
-}
+import aiohttp
+from aiohttp import ClientTimeout
+import os
+from .const import TRAFFIC_URL, DE_MONTHS
 
 class TrafficAPI:
-    def _parse_german_datetime(self, s: str) -> Optional[str]:
+    def __init__(self, session: Optional[aiohttp.ClientSession] = None):
+        self._session = session
+
+    @staticmethod
+    def _parse_german_datetime(s: str) -> Optional[str]:
         """
-        Parse strings like '21. September 2025, 15:35 Uhr' to ISO 8601.
+        Parse strings like '21. September 2025, 15:35 Uhr' to ISO 8601 (no tz).
         Returns ISO string in local time (no timezone info) or None if parsing fails.
         """
+        if not s:
+            return None
         s = s.strip()
-        # 21. September 2025, 15:35 Uhr
         m = re.match(r"(\d{1,2})\.\s*([A-Za-zäöüÄÖÜ]+)\s+(\d{4}),\s*(\d{1,2}):(\d{2})", s)
         if not m:
             return None
@@ -37,23 +40,39 @@ class TrafficAPI:
         except ValueError:
             return None
 
-
-    def _fetch_html(self, source: str) -> str:
-        """Load HTML either from a local file path or from a URL."""
+    async def _fetch_html(self, source: str, *, timeout_s: int = 20) -> str:
+        """
+        Load HTML either from a local file path or from a URL.
+        - URLs: fetched via aiohttp (async)
+        - Files: read in a thread pool to avoid blocking the loop
+        """
         if re.match(r"^https?://", source):
-            if requests is None:
-                raise RuntimeError("requests not installed; cannot fetch URL")
-            resp = requests.get(source, timeout=20)
-            resp.raise_for_status()
-            return resp.text
+            close_when_done = False
+            session = self._session
+            if session is None:
+                session = aiohttp.ClientSession(timeout=ClientTimeout(total=timeout_s))
+                close_when_done = True
+            try:
+                async with session.get(
+                    source,
+                    headers={"User-Agent": "traffic-scraper/1.0 (+https://example.local)"}
+                ) as resp:
+                    resp.raise_for_status()
+                    # let aiohttp handle encoding detection
+                    return await resp.text()
+            finally:
+                if close_when_done:
+                    await session.close()
         else:
-            with open(source, "r", encoding="utf-8") as f:
-                return f.read()
+            loop = asyncio.get_running_loop()
+            path = os.fspath(source)
+            return await loop.run_in_executor(None, lambda: open(path, "r", encoding="utf-8").read())
 
-
-    def _parse_traffic(self, html: str) -> List[Dict[str, Any]]:
+    @staticmethod
+    def _parse_traffic(html: str) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(html, "html.parser")
-        entries = []
+        entries: List[Dict[str, Any]] = []
+
         for li in soup.select("li.traffic-section-entry"):
             kind = li.select_one(".traffic-event-topline")
             title = li.select_one(".traffic-event-title")
@@ -64,21 +83,26 @@ class TrafficAPI:
             title_text = title.get_text(" ", strip=True) if title else None
 
             # message element can contain multiple lines <br> or multiple text nodes
-            message_text = None
+            message_text: Optional[str] = None
             if msg_block:
                 message_text = " ".join(msg_block.stripped_strings)
 
             date_text = date.get_text(strip=True) if date else None
-            date_parsed = self._parse_german_datetime(date_text) if date_text else None
+            date_parsed = TrafficAPI._parse_german_datetime(date_text) if date_text else None
 
             entries.append({
                 "type": kind_text,            # e.g., "Stau", "Blitzer"
                 "title": title_text,          # full headline
                 "message": message_text,      # extra details (may be None)
-                "date": date_parsed,         # ISO 8601 minutes precision (best effort)
+                "date": date_parsed,          # ISO 8601 minutes precision (best effort)
             })
         return entries
 
-    def fetch(self) -> List[Dict[str, Any]]:
-        html = self._fetch_html("https://www.bremenvier.de/verkehr/aktuelle-verkehrsmeldungen-aus-dem-land-bremen-und-der-region-100.html")
+    async def fetch(self, source: Union[str, None] = None) -> List[Dict[str, Any]]:
+        """
+        Fetch and parse traffic data.
+        If 'source' is None, the default TRAFFIC_URL is used.
+        """
+        src = source or TRAFFIC_URL
+        html = await self._fetch_html(src)
         return self._parse_traffic(html)
