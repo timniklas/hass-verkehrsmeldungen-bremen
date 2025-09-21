@@ -1,0 +1,11 @@
+{
+  "domain": "verkehrsmeldungen_bremenvier",
+  "name": "Bremen Vier - Verkehrsmeldungen",
+  "codeowners": ["@timniklas"],
+  "config_flow": true,
+  "documentation": "https://github.com/timniklas/hass-verkehrsmeldungen_bremenvier",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/timniklas/hass-verkehrsmeldungen_bremenvier/issues",
+  "version": "0.0.0",
+  "single_config_entry": true
+}
