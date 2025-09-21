@@ -56,7 +56,7 @@ class TrafficCoordinator(DataUpdateCoordinator):
             data = await self.api.fetch()
             sorted_data = sorted(data, key=lambda x: datetime.fromisoformat(x["date"]), reverse=True)
             self.connected = True
-            return TrafficAPIData(items=data)
+            return TrafficAPIData(items=sorted_data)
         except ClientError as err:
             # This will show entities as unavailable by raising UpdateFailed exception
             raise UpdateFailed(f"Error communicating with API: {err}") from err
