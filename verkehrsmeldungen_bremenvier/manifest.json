@@ -8,5 +8,5 @@
   "issue_tracker": "https://github.com/timniklas/hass-verkehrsmeldungen_bremenvier/issues",
   "version": "0.0.0",
   "single_config_entry": true,
-  "requirements": ["beautifulsoup4", "requests"]
+  "requirements": ["beautifulsoup4"]
 }
