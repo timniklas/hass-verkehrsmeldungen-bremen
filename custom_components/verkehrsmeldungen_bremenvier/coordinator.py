@@ -37,7 +37,7 @@ class TrafficCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=f"{DOMAIN} ({config_entry.unique_id})",
             # Method to call on every update interval.
-            update_method=self.update_data,
+            update_method=self.async_update_data,
             # Polling interval. Will only be polled if there are subscribers.
             update_interval=timedelta(seconds=60),
         )
