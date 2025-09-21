@@ -52,7 +52,7 @@ class TrafficCoordinator(DataUpdateCoordinator):
         so entities can quickly look up their data.
         """
         try:
-            data = await api.fetch()
+            data = await self.api.fetch()
             self.connected = True
             return TrafficAPIData(items=data)
         except ClientError as err:
