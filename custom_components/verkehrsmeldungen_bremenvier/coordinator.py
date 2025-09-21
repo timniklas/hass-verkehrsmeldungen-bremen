@@ -4,6 +4,7 @@ import logging
 
 import re
 
+from datetime import datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -53,6 +54,7 @@ class TrafficCoordinator(DataUpdateCoordinator):
         """
         try:
             data = await self.api.fetch()
+            sorted_data = sorted(data, key=lambda x: datetime.fromisoformat(x["date"]), reverse=True)
             self.connected = True
             return TrafficAPIData(items=data)
         except ClientError as err:
